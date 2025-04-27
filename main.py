@@ -1,5 +1,7 @@
 import os
 import asyncio
+import logging
+import logging.handlers
 from dotenv import load_dotenv
 
 import discord
@@ -9,7 +11,7 @@ from database.models import Base
 from database.connect import engine
 
 load_dotenv()
-DISCORD_TOKEN = str(os.getenv("DISCORD_TOKEN"))
+DISCORD_TOKEN = str(os.getenv("DISCORD_TEST_TOKEN"))
 
 # Check if the database file exists and create tables if it doesn't
 if not os.path.isfile("database/database.db"):
@@ -22,6 +24,21 @@ if not os.path.isfile("database/database.db"):
         print("Tables created successfully.")
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
+
+logger = logging.getLogger('discord')
+logger.setLevel(logging.DEBUG)
+logging.getLogger('discord.http').setLevel(logging.INFO)
+
+handler = logging.handlers.RotatingFileHandler(
+    filename='logs/discord.log',
+    encoding='utf-8',
+    maxBytes=32 * 1024 * 1024,  # 32 MiB
+    backupCount=5,  # Rotate through 5 files
+)
+dt_fmt = '%Y-%m-%d %H:%M:%S'
+formatter = logging.Formatter('[{asctime}] [{levelname:<8}] {name}: {message}', dt_fmt, style='{')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 @bot.event
