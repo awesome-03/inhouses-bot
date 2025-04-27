@@ -7,6 +7,10 @@ from dotenv import load_dotenv
 from discord import app_commands
 from discord.ext import commands
 
+from database.models import Rank
+from database.connect import session
+from sqlalchemy import insert, update
+
 load_dotenv()
 VAL_API_KEY = os.getenv("VAL_API_KEY")
 VAL_API_ENDPOINT = "https://api.henrikdev.xyz/valorant"
@@ -41,27 +45,47 @@ RANK_ROLES = [
 
 
 def load_to_db(username, ign, rank):
-    connection = sqlite3.connect("data.db")
-    cursor = connection.cursor()
+    with session() as sess:
+        if sess.query(Rank).first() is None:
+            sess.execute(insert(Rank).values(
+                    username="",
+                    ign="",
+                    rank="",
+                    last_update=int(time.time())
+                )
+            )
+            return
+        else:
+            sess.execute(update(Rank).where(Rank.username == username).values(
+                    ign=ign,
+                    rank=rank,
+                    last_update=int(time.time())
+                )
+            )
+    
 
-    cursor.execute(f"SELECT * FROM ranks WHERE username = '{username}'")
-    connection.commit()
+# def load_to_db(username, ign, rank):
+#     connection = sqlite3.connect("data.db")
+#     cursor = connection.cursor()
 
-    if cursor.fetchall() == []:
-        cursor.execute(
-            """INSERT INTO ranks VALUES (?, ?, ?, ?)""",
-            (username, ign, rank, int(time.time())),
-        )
-    else:
-        cursor.execute(
-            """UPDATE ranks SET ign = ?, rank = ?, last_update = ? WHERE username = ?""",
-            (ign, rank, int(time.time()), username),
-        )
+#     cursor.execute(f"SELECT * FROM ranks WHERE username = '{username}'")
+#     connection.commit()
 
-    connection.commit()
+#     if cursor.fetchall() == []:
+#         cursor.execute(
+#             """INSERT INTO ranks VALUES (?, ?, ?, ?)""",
+#             (username, ign, rank, int(time.time())),
+#         )
+#     else:
+#         cursor.execute(
+#             """UPDATE ranks SET ign = ?, rank = ?, last_update = ? WHERE username = ?""",
+#             (ign, rank, int(time.time()), username),
+#         )
 
-    cursor.close()
-    connection.close()
+#     connection.commit()
+
+#     cursor.close()
+#     connection.close()
 
 
 class RankSetter(commands.Cog):

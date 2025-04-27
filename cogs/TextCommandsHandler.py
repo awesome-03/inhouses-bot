@@ -4,55 +4,66 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from database.models import Command
+from database.connect import session
+from sqlalchemy import select, delete, insert, update
 
-def load_to_db(command, command_content, adder_username):
-    connection = sqlite3.connect("data.db")
-    cursor = connection.cursor()
+# def load_to_db(command, command_content, adder_username):
+#     connection = sqlite3.connect("data.db")
+#     cursor = connection.cursor()
 
-    cursor.execute("""INSERT INTO text_commands VALUES (?, ?, ?, ?)""", (command, command_content, adder_username, int(time.time())))
-    connection.commit()
+#     cursor.execute("""INSERT INTO text_commands VALUES (?, ?, ?, ?)""", (command, command_content, adder_username, int(time.time())))
+#     connection.commit()
 
-    cursor.close()
-    connection.close()
-
-
-def delete_from_db(command):
-    connection = sqlite3.connect("data.db")
-    cursor = connection.cursor()
-
-    cursor.execute("""DELETE FROM text_commands WHERE command = ?""", (command, ))
-    connection.commit()
-
-    cursor.close()
-    connection.close()
+#     cursor.close()
+#     connection.close()
 
 
-def edit_db(command, command_content, adder_username):
-    connection = sqlite3.connect("data.db")
-    cursor = connection.cursor()
 
-    cursor.execute("""UPDATE text_commands SET command_content = ?, adder_username = ?, added_date = ? WHERE command = ?""", (command_content, adder_username, int(time.time()), command))
-    connection.commit()
+# def delete_from_db(command):
+#     connection = sqlite3.connect("data.db")
+#     cursor = connection.cursor()
 
-    cursor.close()
-    connection.close()
+#     cursor.execute("""DELETE FROM text_commands WHERE command = ?""", (command, ))
+#     connection.commit()
+
+#     cursor.close()
+#     connection.close()
+
+# def edit_db(command, command_content, adder_username):
+#     connection = sqlite3.connect("data.db")
+#     cursor = connection.cursor()
+
+#     cursor.execute("""UPDATE text_commands SET command_content = ?, adder_username = ?, added_date = ? WHERE command = ?""", (command_content, adder_username, int(time.time()), command))
+#     connection.commit()
+
+#     cursor.close()
+#     connection.close()
 
 
 def read_db() -> dict:
-    connection = sqlite3.connect("data.db")
-    cursor = connection.cursor()
-
-    cursor.execute("""SELECT * FROM text_commands""")
-    rows = cursor.fetchall()
+    with session() as sess:
+        rows = sess.execute(select(Command)).all() #TODO: This needs to be tested, might not work.
 
     formatted_dict = {}
     for row in rows:
         formatted_dict[row[0]] = row[1]
-
-    cursor.close()
-    connection.close()
-
+    
     return formatted_dict
+    # connection = sqlite3.connect("data.db")
+    # cursor = connection.cursor()
+
+    # cursor.execute("""SELECT * FROM text_commands""")
+    # rows = cursor.fetchall()
+
+    # formatted_dict = {}
+    # for row in rows:
+    #     formatted_dict[row[0]] = row[1]
+
+    # cursor.close()
+    # connection.close()
+
+    # return formatted_dict
 
 added_commands = read_db()
 
@@ -75,9 +86,20 @@ class TextCommandsHandler(commands.Cog):
         else:
             cmd_exists = False
         if cmd_exists:
-            edit_db(new_command, command_message, interaction.user.name)
+            with session() as sess:
+                sess.execute(update(Command).where(Command.command == new_command).values(
+                    command_content=command_message,
+                    adder_username=interaction.user.name,
+                    added_date=int(time.time())
+                ))
         else:
-            load_to_db(new_command, command_message, interaction.user.name)
+            with session() as sess:
+                sess.execute(insert(Command).values(
+                    command=new_command,
+                    command_content=command_message,
+                    adder_username=interaction.user.name,
+                    added_date=int(time.time())
+                ))
 
         self.added_commands[new_command.lower()] = command_message
         self.update_aliases()
@@ -91,7 +113,8 @@ class TextCommandsHandler(commands.Cog):
             self.added_commands.pop(command)
             self.update_aliases()
             await interaction.response.send_message("Command has been removed.", ephemeral=True)
-            delete_from_db(command)
+            with session() as sess:
+                sess.execute(delete(Command).where(Command.command == command))
         except KeyError:
             await interaction.response.send_message("That command does not exist.", ephemeral=True)
 

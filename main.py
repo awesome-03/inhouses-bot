@@ -3,9 +3,21 @@ import discord
 import os
 from dotenv import load_dotenv
 from discord.ext import commands
+from database.models import Base
+from database.connect import engine
+
+if not os.path.isfile("database/database.db"):
+    try:
+        print("Creating tables...")
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print("An error occurred while creating tables: ", e)
+    else:
+        print("Tables created successfully.")
+
 
 load_dotenv()
-DISCORD_TOKEN = str(os.getenv('DISCORD_TOKEN')) 
+DISCORD_TOKEN = str(os.getenv('DISCORD_TEST_TOKEN')) 
 
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 

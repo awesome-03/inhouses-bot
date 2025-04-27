@@ -1,23 +1,16 @@
 import time
-import sqlite3
+# import sqlite3
 import discord
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
 
+from database.models import PingLog
+from database.connect import session
+from sqlalchemy import insert
+
 load_dotenv()
 INHOUSE_PING_ROLE_ID = str(os.getenv('INHOUSE_PING_ROLE_ID'))
-
-
-def log_pings(pinged_by, ping_time):
-    connection = sqlite3.connect("data.db")
-    cursor = connection.cursor()
-
-    cursor.execute("""INSERT INTO ping_logs VALUES (?, ?)""", (pinged_by, ping_time))
-    connection.commit()
-
-    cursor.close()
-    connection.close()
 
 # Here I should implement an actual timer instead of listening to messages 
 class InhousePingHandler(commands.Cog):
@@ -37,7 +30,8 @@ class InhousePingHandler(commands.Cog):
             await role.edit(mentionable=True)
         if f"<@&{INHOUSE_PING_ROLE_ID}>" in message.content:
             self.last_mention = time.time()
-            log_pings(message.author.name, int(time.time()))
+            with session() as sess:
+                sess.execute(insert(PingLog).values(pinged_by=message.author.name, ping_time=int(time.time())))
             role = discord.utils.get(message.guild.roles, name="Inhouse Ping")
             await role.edit(mentionable=False)
 
