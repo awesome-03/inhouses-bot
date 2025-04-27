@@ -11,7 +11,7 @@ from database.models import Base
 from database.connect import engine
 
 load_dotenv()
-DISCORD_TOKEN = str(os.getenv("DISCORD_TEST_TOKEN"))
+DISCORD_TOKEN = str(os.getenv("DISCORD_TOKEN"))
 
 # Check if the database file exists and create tables if it doesn't
 if not os.path.isfile("database/database.db"):
