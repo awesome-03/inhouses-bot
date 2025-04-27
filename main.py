@@ -1,11 +1,17 @@
-import asyncio
-import discord
 import os
+import asyncio
 from dotenv import load_dotenv
+
+import discord
 from discord.ext import commands
+
 from database.models import Base
 from database.connect import engine
 
+load_dotenv()
+DISCORD_TOKEN = str(os.getenv("DISCORD_TOKEN"))
+
+# Check if the database file exists and create tables if it doesn't
 if not os.path.isfile("database/database.db"):
     try:
         print("Creating tables...")
@@ -15,22 +21,20 @@ if not os.path.isfile("database/database.db"):
     else:
         print("Tables created successfully.")
 
+bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
-load_dotenv()
-DISCORD_TOKEN = str(os.getenv('DISCORD_TEST_TOKEN')) 
-
-bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 
 @bot.event
 async def on_ready():
     print("Bot is online!")
+    # Uncomment these lines to sync commands on startup:
+
     # try:
     #     synced_commands = await bot.tree.sync()
     #     print(f"Synced {len(synced_commands)} commands.")
     # except Exception as e:
     #     print("An error with syncing application commands has occurred: ", e)
 
-    # Uncomment the following line to sync commands on startup
 
 async def load():
     for filename in os.listdir("./cogs"):

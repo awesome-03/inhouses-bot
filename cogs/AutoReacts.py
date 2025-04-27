@@ -1,5 +1,5 @@
 import time
-# import sqlite3
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -8,77 +8,27 @@ from database.models import AutoReact
 from database.connect import session
 from sqlalchemy import select, delete, insert
 
-# def load_to_db(reaction, user_id, user_name, added_by):
-#     connection = sqlite3.connect("data.db")
-#     cursor = connection.cursor()
-
-#     cursor.execute("""INSERT INTO auto_reacts VALUES (?, ?, ?, ?, ?)""", (reaction, user_id, user_name, added_by, int(time.time())))
-#     connection.commit()
-
-#     cursor.close()
-#     connection.close()
-
-# def delete_from_db(reaction, user_id):
-#     connection = sqlite3.connect("data.db")
-#     cursor = connection.cursor()
-
-#     cursor.execute("""DELETE FROM auto_reacts WHERE reaction = ? AND user_id = ?""", (reaction, user_id))
-#     connection.commit()
-
-#     cursor.close()
-#     connection.close()
-
 def read_all() -> str:
     with session() as sess:
-        rows = sess.execute(select(AutoReact.reaction, AutoReact.user_name)).all() #TODO: This needs to be tested, might not work.
-    
+        reaction_list = sess.execute(select(AutoReact.reaction, AutoReact.user_name)).all()
     formatted_reacts = []
-    for row in rows:
-        formatted_reacts.append(f"reaction: {row[0]}, username: {row[1].replace("_", "\\_")}")
+    for reaction in reaction_list:
+        formatted_reacts.append(f"reaction: {reaction[0]}, username: {reaction[1].replace("_", "\\_")}")
     
     formatted_response = ""
     for row in formatted_reacts:
         formatted_response += f"{row}\n"
 
     return formatted_response
-    # connection = sqlite3.connect("data.db")
-    # cursor = connection.cursor()
-
-    # cursor.execute("""SELECT reaction, user_name FROM auto_reacts""")
-    # rows = cursor.fetchall()
-
-    
-
-    # cursor.close()
-    # connection.close()
-
-    # return formatted_response
-
 
 def read_reactions() -> list:
     with session() as sess:
-        rows = sess.execute(select(AutoReact.reaction, AutoReact.user_id)).all() #TODO: This needs to be tested, might not work.
-    
+        reaction_list = sess.execute(select(AutoReact.reaction, AutoReact.user_id)).all()
     formatted_reacts = []
-    for row in rows:
-        formatted_reacts.append((row[1], row[0]))
+    for reaction in reaction_list:
+        formatted_reacts.append((reaction[1], reaction[0]))
 
     return formatted_reacts
-
-    # connection = sqlite3.connect("data.db")
-    # cursor = connection.cursor()
-
-    # cursor.execute("""SELECT reaction, user_id FROM auto_reacts""")
-    # rows = cursor.fetchall()
-
-    # formatted_reacts = []
-    # for row in rows:
-    #     formatted_reacts.append((row[1], row[0]))
-
-    # cursor.close()
-    # connection.close()
-
-    # return formatted_reacts
 
 auto_reacts = read_reactions()
 
@@ -109,6 +59,7 @@ class AutoReacts(commands.Cog):
                     added_by=interaction.user.name,
                     added_date=int(time.time())
                     ))
+                sess.commit()
             await interaction.followup.send(f"Successfully added reaction to {user.mention}", ephemeral=True)
 
     @app_commands.command(name="remove_reaction", description="Removes a reaction from a message")
@@ -119,6 +70,8 @@ class AutoReacts(commands.Cog):
         try:
             with session() as sess:
                 sess.execute(delete(AutoReact).where(AutoReact.user_id==user.id, AutoReact.reaction==reaction))
+                sess.commit()
+            auto_reacts.remove((user.id, reaction))
             await interaction.followup.send(f"Successfully removed reaction from {user.mention}", ephemeral=True)
         except ValueError:
             await interaction.followup.send(f"{user.mention} does not have that reaction", ephemeral=True)

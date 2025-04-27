@@ -1,9 +1,9 @@
+import os
 import time
-# import sqlite3
+from dotenv import load_dotenv
+
 import discord
 from discord.ext import commands
-import os
-from dotenv import load_dotenv
 
 from database.models import PingLog
 from database.connect import session
@@ -32,6 +32,7 @@ class InhousePingHandler(commands.Cog):
             self.last_mention = time.time()
             with session() as sess:
                 sess.execute(insert(PingLog).values(pinged_by=message.author.name, ping_time=int(time.time())))
+                sess.commit()
             role = discord.utils.get(message.guild.roles, name="Inhouse Ping")
             await role.edit(mentionable=False)
 

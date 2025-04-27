@@ -1,9 +1,9 @@
 import os
 import time
-import sqlite3
-import discord
 import requests
 from dotenv import load_dotenv
+
+import discord
 from discord import app_commands
 from discord.ext import commands
 
@@ -48,44 +48,21 @@ def load_to_db(username, ign, rank):
     with session() as sess:
         if sess.query(Rank).first() is None:
             sess.execute(insert(Rank).values(
-                    username="",
-                    ign="",
-                    rank="",
-                    last_update=int(time.time())
+                        username=username,
+                        ign=ign,
+                        rank=rank,
+                        last_update=int(time.time())
+                    )
                 )
-            )
-            return
+            sess.commit()
         else:
             sess.execute(update(Rank).where(Rank.username == username).values(
-                    ign=ign,
-                    rank=rank,
-                    last_update=int(time.time())
+                        ign=ign,
+                        rank=rank,
+                        last_update=int(time.time())
+                    )
                 )
-            )
-    
-
-# def load_to_db(username, ign, rank):
-#     connection = sqlite3.connect("data.db")
-#     cursor = connection.cursor()
-
-#     cursor.execute(f"SELECT * FROM ranks WHERE username = '{username}'")
-#     connection.commit()
-
-#     if cursor.fetchall() == []:
-#         cursor.execute(
-#             """INSERT INTO ranks VALUES (?, ?, ?, ?)""",
-#             (username, ign, rank, int(time.time())),
-#         )
-#     else:
-#         cursor.execute(
-#             """UPDATE ranks SET ign = ?, rank = ?, last_update = ? WHERE username = ?""",
-#             (ign, rank, int(time.time()), username),
-#         )
-
-#     connection.commit()
-
-#     cursor.close()
-#     connection.close()
+            sess.commit()
 
 
 class RankSetter(commands.Cog):
@@ -128,8 +105,20 @@ class RankSetter(commands.Cog):
             await interaction.followup.send("This rank does not exist", ephemeral=True)
         except Exception as e:
             print(e)
-            await interaction.followup.send(e, ephemeral=True)
+            await interaction.followup.send("Your rank was wrong probably idk :p", ephemeral=True) #Need to add a better error handling here
 
+    @app_commands.command(
+        name="remove_rank",
+        description="Removes your rank role. You will not be able to see #open-queue after using this command.",
+    )
+    async def remove_rank(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        for rank_role in RANK_ROLES:
+            rank_id = discord.utils.get(interaction.guild.roles, name=rank_role)
+            if rank_id is not None:
+                await interaction.user.remove_roles(rank_id)
+        await interaction.user.remove_roles(discord.utils.get(interaction.guild.roles, name="Linked Rank Role"))
+        await interaction.followup.send("Your rank roles have been removed.", ephemeral=True)
 
 def get_rank(ign: str):
     """Returns the current rank of ign"""
