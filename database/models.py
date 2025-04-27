@@ -23,7 +23,7 @@ class Rank(Base):
 
 class PingLog(Base):
     __tablename__ = "ping_logs"
-    pinged_by: Mapped[str]
+    pinged_by: Mapped[str] = mapped_column(primary_key=True)
     ping_time: Mapped[int] = mapped_column(primary_key=True)
 
 
