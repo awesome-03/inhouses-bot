@@ -14,14 +14,14 @@ load_dotenv()
 DISCORD_TOKEN = str(os.getenv("DISCORD_TOKEN"))
 
 # Check if the database file exists and create tables if it doesn't
-if not os.path.isfile("database/database.db"):
-    try:
-        print("Creating tables...")
-        Base.metadata.create_all(bind=engine)
-    except Exception as e:
-        print("An error occurred while creating tables: ", e)
-    else:
-        print("Tables created successfully.")
+# if not os.path.isfile("database/database.db"):
+#     try:
+#         print("Creating tables...")
+#         Base.metadata.create_all(bind=engine)
+#     except Exception as e:
+#         print("An error occurred while creating tables: ", e)
+#     else:
+#         print("Tables created successfully.")
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
