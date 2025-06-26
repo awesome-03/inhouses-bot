@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 import discord
 from discord.ext import commands
 
-from database.models import Base
-from database.connect import engine
+# from database.models import Base
+# from database.connect import engine
 
 load_dotenv()
 DISCORD_TOKEN = str(os.getenv("DISCORD_TOKEN"))
