@@ -1,5 +1,6 @@
-# So here is some AI slop for ya... Test extensively.
+import os
 import time
+from dotenv import load_dotenv
 
 import discord
 from discord.ext import commands
@@ -10,13 +11,15 @@ from database.connect import session
 from sqlalchemy import select, delete
 from helpers import get_or_create_user
 
+load_dotenv()
+REACTION_COOLDOWN = int(os.getenv("REACTION_COOLDOWN", 7))
 
 def read_all() -> str:
     with session() as sess:
         reaction_list = sess.execute(
-            select(AutoReact.reaction, User.username).join(
-                User, AutoReact.user_id == User.discord_id
-            )
+            select(AutoReact.reaction, User.username)
+            .join(User, AutoReact.user_id == User.discord_id)
+            .order_by(User.username)
         ).all()
     formatted_reacts = []
     for reaction in reaction_list:
@@ -55,8 +58,7 @@ class AutoReacts(commands.Cog):
     async def on_ready(self):
         print(f"{__name__} is ready!")
 
-    # TODO: Check which things are getting selected from the users table when you run the list reactions command
-    # TODO: Check if the reaction is valid before adding it, cannot remove it afterwards if the reaction is invalid
+    # TODO: Check if the reaction is valid before adding it
     # TODO: There was a bug with the last code, find and fix
     @app_commands.command(
         name="add_reaction", description="Adds a reaction to a message"
@@ -131,7 +133,7 @@ class AutoReacts(commands.Cog):
         if message.author.bot:
             return
 
-        if time.time() > self.last_reaction + 7:
+        if time.time() > self.last_reaction + REACTION_COOLDOWN:
             for user_id, reaction in auto_reacts:
                 if message.author.id == user_id:
                     if ":" in reaction:

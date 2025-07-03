@@ -8,9 +8,10 @@ import discord
 from discord.ext import commands
 
 load_dotenv()
-DISCORD_TOKEN = str(os.getenv("DISCORD_TOKEN"))
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+COMMAND_PREFIX = os.getenv("COMMAND_PREFIX")
 
-bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
+bot = commands.Bot(command_prefix=COMMAND_PREFIX, intents=discord.Intents.all())
 
 logger = logging.getLogger("discord")
 logger.setLevel(logging.DEBUG)

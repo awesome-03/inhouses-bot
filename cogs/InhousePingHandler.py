@@ -1,7 +1,3 @@
-# So here is some AI slop for ya... Test extensively.
-# TODO: Check if the ping is an actual ping and not just the id in ``` like this ```
-# TODO: Did not make sure that the role is in the guild before adding it to the logs
-# TODO: Didn't test if the timer works, or how it behaves whenever there is a ping while the cooldown is on.
 import os
 import time
 from dotenv import load_dotenv
@@ -14,10 +10,10 @@ from database.models import Log
 from database.connect import session
 
 load_dotenv()
-INHOUSE_PING_ROLE_ID = str(os.getenv("INHOUSE_PING_ROLE_ID"))
+INHOUSE_PING_ROLE_ID = int(os.getenv("INHOUSE_PING_ROLE_ID"))
+PING_COOLDOWN = int(os.getenv("PING_COOLDOWN", 3600))
 
-PING_COOLDOWN = 60 # in seconds
-
+# TODO: Check if the ping is an actual ping and not just the id in ``` like this ```
 
 class InhousePingHandler(commands.Cog):
     def __init__(self, bot):
@@ -49,20 +45,19 @@ class InhousePingHandler(commands.Cog):
             async with self._ping_lock:
                 self.last_mention = time.time()
 
-                with session() as sess:
-                    new_log = Log(action="PNG", user_id=str(message.author.id))
-                    sess.add(new_log)
-                    sess.commit()
-
-                role = message.guild.get_role(int(INHOUSE_PING_ROLE_ID))
+                role = message.guild.get_role(INHOUSE_PING_ROLE_ID)
                 if not role:
                     print(f"Error: Role with ID {INHOUSE_PING_ROLE_ID} not found.")
                     return
 
                 await role.edit(mentionable=False)
                 print(f"Disabled mentions for role '{role.name}'")
-
                 self.bot.loop.create_task(self.ping_cooldown_task(role))
+
+                with session() as sess:
+                    new_log = Log(action="PNG", user_id=str(message.author.id))
+                    sess.add(new_log)
+                    sess.commit()
 
 
 async def setup(bot):
