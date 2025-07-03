@@ -1,34 +1,47 @@
+# So here is some AI slop for ya... Test extensively.
 import time
 
 import discord
 from discord.ext import commands
 from discord import app_commands
 
-from database.models import AutoReact
+from database.models import AutoReact, User, Log
 from database.connect import session
-from sqlalchemy import select, delete, insert
+from sqlalchemy import select, delete
+from helpers import get_or_create_user
+
 
 def read_all() -> str:
     with session() as sess:
-        reaction_list = sess.execute(select(AutoReact.reaction, AutoReact.user_name)).all()
+        reaction_list = sess.execute(
+            select(AutoReact.reaction, User.username).join(
+                User, AutoReact.user_id == User.discord_id
+            )
+        ).all()
     formatted_reacts = []
     for reaction in reaction_list:
-        formatted_reacts.append(f"reaction: {reaction[0]}, username: {reaction[1].replace("_", "\\_")}")
-    
+        formatted_reacts.append(
+            f"reaction: {reaction[0]}, username: {reaction[1].replace('_', '\\_')}"
+        )
+
     formatted_response = ""
     for row in formatted_reacts:
         formatted_response += f"{row}\n"
 
     return formatted_response
 
+
 def read_reactions() -> list:
     with session() as sess:
-        reaction_list = sess.execute(select(AutoReact.reaction, AutoReact.user_id)).all()
+        reaction_list = sess.execute(
+            select(AutoReact.reaction, AutoReact.user_id)
+        ).all()
     formatted_reacts = []
     for reaction in reaction_list:
-        formatted_reacts.append((reaction[1], reaction[0]))
+        formatted_reacts.append((int(reaction[1]), reaction[0]))
 
     return formatted_reacts
+
 
 auto_reacts = read_reactions()
 
@@ -42,39 +55,70 @@ class AutoReacts(commands.Cog):
     async def on_ready(self):
         print(f"{__name__} is ready!")
 
-    @app_commands.command(name="add_reaction", description="Adds a reaction to a message")
+    # TODO: Check which things are getting selected from the users table when you run the list reactions command
+    # TODO: Check if the reaction is valid before adding it, cannot remove it afterwards if the reaction is invalid
+    # TODO: There was a bug with the last code, find and fix
+    @app_commands.command(
+        name="add_reaction", description="Adds a reaction to a message"
+    )
     @app_commands.checks.has_permissions(administrator=True)
-    async def add_reaction(self, interaction: discord.Interaction, user: discord.Member, reaction: str):
+    async def add_reaction(
+        self, interaction: discord.Interaction, user: discord.Member, reaction: str
+    ):
         global auto_reacts
         await interaction.response.defer(ephemeral=True)
         if (user.id, reaction) in auto_reacts:
-            await interaction.followup.send(f"{user.mention} already has that reaction", ephemeral=True)
+            await interaction.followup.send(
+                f"{user.mention} already has that reaction", ephemeral=True
+            )
         else:
             auto_reacts.append((user.id, reaction))
             with session() as sess:
-                sess.execute(insert(AutoReact).values(
-                    reaction=reaction,
-                    user_id=user.id,
-                    user_name=user.name,
-                    added_by=interaction.user.name,
-                    added_date=int(time.time())
-                    ))
-                sess.commit()
-            await interaction.followup.send(f"Successfully added reaction to {user.mention}", ephemeral=True)
+                get_or_create_user(sess, user)
 
-    @app_commands.command(name="remove_reaction", description="Removes a reaction from a message")
+                new_log = Log(action="RCT_add", user_id=str(interaction.user.id))
+                sess.add(new_log)
+                sess.flush()
+
+                new_react = AutoReact(
+                    reaction=reaction, user_id=str(user.id), log_id=new_log.log_id
+                )
+                sess.add(new_react)
+                sess.commit()
+            await interaction.followup.send(
+                f"Successfully added reaction to {user.mention}", ephemeral=True
+            )
+
+    @app_commands.command(
+        name="remove_reaction", description="Removes a reaction from a message"
+    )
     @app_commands.checks.has_permissions(administrator=True)
-    async def remove_reaction(self, interaction: discord.Interaction, user: discord.Member, reaction: str):
+    async def remove_reaction(
+        self, interaction: discord.Interaction, user: discord.Member, reaction: str
+    ):
         global auto_reacts
         await interaction.response.defer(ephemeral=True)
         try:
             with session() as sess:
-                sess.execute(delete(AutoReact).where(AutoReact.user_id==user.id, AutoReact.reaction==reaction))
+                get_or_create_user(sess, interaction.user)
+
+                new_log = Log(action="RCT_rmv", user_id=str(interaction.user.id))
+                sess.add(new_log)
+                sess.execute(
+                    delete(AutoReact).where(
+                        AutoReact.user_id == str(user.id),
+                        AutoReact.reaction == reaction,
+                    )
+                )
                 sess.commit()
             auto_reacts.remove((user.id, reaction))
-            await interaction.followup.send(f"Successfully removed reaction from {user.mention}", ephemeral=True)
+            await interaction.followup.send(
+                f"Successfully removed reaction from {user.mention}", ephemeral=True
+            )
         except ValueError:
-            await interaction.followup.send(f"{user.mention} does not have that reaction", ephemeral=True)
+            await interaction.followup.send(
+                f"{user.mention} does not have that reaction", ephemeral=True
+            )
 
     @app_commands.command(name="list_reactions", description="Lists all reactions")
     @app_commands.checks.has_permissions(administrator=True)
@@ -84,14 +128,25 @@ class AutoReacts(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        if message.author.bot:
+            return
+
         if time.time() > self.last_reaction + 7:
             for user_id, reaction in auto_reacts:
                 if message.author.id == user_id:
                     if ":" in reaction:
-                        emoji = message.guild.get_emoji(int(reaction.split(":")[2][:-1]))
-                    else: 
+                        try:
+                            emoji = message.guild.get_emoji(
+                                int(reaction.split(":")[2][:-1])
+                            )
+                        except (IndexError, ValueError):
+                            emoji = None
+                            print(f"Something went wrong with reaction: {reaction}")
+                    else:
                         emoji = reaction
-                    await message.add_reaction(emoji)
+
+                    if emoji:
+                        await message.add_reaction(emoji)
                     self.last_reaction = time.time()
 
 
