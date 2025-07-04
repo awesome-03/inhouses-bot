@@ -1,5 +1,5 @@
 import os
-import requests
+import aiohttp
 from dotenv import load_dotenv
 
 import discord
@@ -45,27 +45,28 @@ RANK_ROLES = [
 ]
 
 
-def fetch_valorant_data(name: str, tag: str, region: str) -> dict | None:
-    """Fetches account and rank data from the Valorant API."""
+async def fetch_valorant_data(name: str, tag: str, region: str) -> dict | None:
+    """Fetches account and rank data from the Valorant API asynchronously."""
     headers = {"Authorization": VAL_API_KEY}
     url = f"{VAL_API_ENDPOINT}/{region}/pc/{name}/{tag}"
 
     try:
-        response = requests.get(url=url, headers=headers)
-        response.raise_for_status()
-        data = response.json().get("data")
+        async with aiohttp.ClientSession() as sess:
+            async with sess.get(url=url, headers=headers) as response:
+                response.raise_for_status()
+                data = (await response.json()).get("data")
 
-        if not data or not data.get("current"):
-            print("API response missing 'data' or 'current' section.")
-            return None
+                if not data or not data.get("current"):
+                    print("API response missing 'data' or 'current' section.")
+                    return None
 
-        return {
-            "puuid": data.get("account", {}).get("puuid"),
-            "name": data.get("account", {}).get("name"),
-            "tag": data.get("account", {}).get("tag"),
-            "rank": data.get("current", {}).get("tier", {}).get("name"),
-        }
-    except requests.exceptions.RequestException as e:
+                return {
+                    "puuid": data.get("account", {}).get("puuid"),
+                    "name": data.get("account", {}).get("name"),
+                    "tag": data.get("account", {}).get("tag"),
+                    "rank": data.get("current", {}).get("tier", {}).get("name"),
+                }
+    except aiohttp.ClientError as e:
         print(f"API request failed: {e}")
         return None
 
@@ -138,7 +139,7 @@ class RankSetter(commands.Cog):
             )
             return
 
-        valorant_data = fetch_valorant_data(name, tag, region)
+        valorant_data = await fetch_valorant_data(name, tag, region)
 
         if not valorant_data or not valorant_data.get("rank"):
             await interaction.followup.send(
@@ -194,7 +195,6 @@ class RankSetter(commands.Cog):
             account_to_delete = sess.execute(stmt).scalar_one_or_none()
 
             if account_to_delete:
-                # INDICATOR: Added logging for removing/unlinking an account
                 log = Log(action="LNK_rmv", user_id=str(interaction.user.id))
                 sess.add(log)
 
